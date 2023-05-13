@@ -55,7 +55,10 @@ async fn main() {
         pool: pool,
     });
     // build our application with a single route
-    let app = Router::new().route("/:user_id", get(handler).with_state(shared_state));
+    let app = Router::new()
+        .route("/", get(root_handler))
+        .route("/:user_id", get(handler))
+        .with_state(shared_state);
     // .route("/posts", get(get_posts));
 
     // run it with hyper on localhost:3000
@@ -63,6 +66,15 @@ async fn main() {
         .serve(app.into_make_service())
         .await
         .unwrap();
+}
+
+async fn root_handler(State(state): State<Arc<AppState>>) -> String {
+    let new_state = state.as_ref();
+    new_state.visitor_count.fetch_add(1, Ordering::SeqCst);
+    format!(
+        "Hello, World! {}",
+        new_state.visitor_count.load(Ordering::SeqCst)
+    )
 }
 
 async fn handler(Path(user_id): Path<String>, State(state): State<Arc<AppState>>) -> String {
