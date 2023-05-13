@@ -1,9 +1,10 @@
 use axum::{
     extract::{Path, State},
     routing::get,
-    Router,
+    Json, Router,
 };
 use chrono::Utc;
+use serde::Serialize;
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 use std::sync::{
     atomic::{AtomicU32, Ordering},
@@ -58,6 +59,7 @@ async fn main() {
     let app = Router::new()
         .route("/", get(root_handler))
         .route("/:user_id", get(handler))
+        .route("/json/:post_id", get(post_json_handler))
         .with_state(shared_state);
     // .route("/posts", get(get_posts));
 
@@ -75,6 +77,18 @@ async fn root_handler(State(state): State<Arc<AppState>>) -> String {
         "Hello, World! {}",
         new_state.visitor_count.load(Ordering::SeqCst)
     )
+}
+
+async fn post_json_handler(
+    Path(user_id): Path<String>,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<Post>, ()> {
+    let new_state = state.as_ref();
+    let mut rows = get_posts(&new_state.pool).await;
+    match rows.pop() {
+        Some(row) => Ok(Json(row)),
+        None => return Err(()),
+    }
 }
 
 async fn handler(Path(user_id): Path<String>, State(state): State<Arc<AppState>>) -> String {
@@ -106,7 +120,8 @@ async fn get_posts(pool: &Pool<Postgres>) -> Vec<Post> {
     rows
 }
 
-#[derive(Debug)]
+// #[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize)]
 struct Post {
     id: i32,
     title: String,
