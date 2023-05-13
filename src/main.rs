@@ -3,6 +3,7 @@ use axum::{
     routing::get,
     Router,
 };
+use chrono::Utc;
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 use std::sync::{
     atomic::{AtomicU32, Ordering},
@@ -44,6 +45,11 @@ async fn main() {
     .await
     .unwrap();
 
+    // sqlx::migrate!("./migrations")
+    //     .run(&pool)
+    //     .await
+    //     .unwrap();
+
     let shared_state = Arc::new(AppState {
         visitor_count: 0.into(),
         pool: pool,
@@ -66,24 +72,26 @@ async fn handler(Path(user_id): Path<String>, State(state): State<Arc<AppState>>
     println!("{:?}", new_state.visitor_count);
     let c = new_state.visitor_count.load(Ordering::SeqCst);
 
-    // let row: (i64,) = sqlx::query_as("SELECT $1")
-    //     .bind(152_i64)
-    //     .fetch_one(&new_state.pool)
-    //     .await
-    //     .unwrap();
-    // println!("{:?}", row.0);
-    let rows = sqlx::query_as!(Post, "SELECT id, title, content, author FROM posts")
-        .fetch_all(&new_state.pool)
-        .await
-        .unwrap();
-    println!("{:?}", rows);
+    let rows = get_posts(&new_state.pool).await;
+
+    for row in rows.iter() {
+        println!("title: {}", row.title);
+    }
+
     let respo = format!("There have been {} visitors.\n{:?}", c, rows);
 
     respo
 }
 
-async fn get_posts(State(state): State<Arc<AppState>>) -> String {
-    "".to_string()
+async fn get_posts(pool: &Pool<Postgres>) -> Vec<Post> {
+    let rows = sqlx::query_as!(
+        Post,
+        "SELECT id, title, content, author, created_at FROM posts"
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap();
+    rows
 }
 
 #[derive(Debug)]
@@ -92,4 +100,5 @@ struct Post {
     title: String,
     content: String,
     author: Option<String>,
+    created_at: Option<chrono::DateTime<Utc>>,
 }
