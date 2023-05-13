@@ -30,6 +30,20 @@ async fn main() {
         .unwrap();
     println!("{:?}", row.0);
 
+    sqlx::query(
+        r#"CREATE TABLE IF NOT EXISTS posts (
+        id SERIAL PRIMARY KEY,  -- unique identifier
+        title VARCHAR(255) NOT NULL,  -- post title
+        content TEXT NOT NULL,  -- post content
+        author VARCHAR(100),  -- author's name
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,  -- creation timestamp
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP  -- last update timestamp
+    );"#,
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
     let shared_state = Arc::new(AppState {
         visitor_count: 0.into(),
         pool: pool,
@@ -51,18 +65,31 @@ async fn handler(Path(user_id): Path<String>, State(state): State<Arc<AppState>>
     new_state.visitor_count.fetch_add(1, Ordering::SeqCst);
     println!("{:?}", new_state.visitor_count);
     let c = new_state.visitor_count.load(Ordering::SeqCst);
-    let respo = format!("There have been {} visitors.", c);
 
-    let row: (i64,) = sqlx::query_as("SELECT $1")
-        .bind(152_i64)
-        .fetch_one(&new_state.pool)
+    // let row: (i64,) = sqlx::query_as("SELECT $1")
+    //     .bind(152_i64)
+    //     .fetch_one(&new_state.pool)
+    //     .await
+    //     .unwrap();
+    // println!("{:?}", row.0);
+    let rows = sqlx::query_as!(Post, "SELECT id, title, content, author FROM posts")
+        .fetch_all(&new_state.pool)
         .await
         .unwrap();
-    println!("{:?}", row.0);
+    println!("{:?}", rows);
+    let respo = format!("There have been {} visitors.\n{:?}", c, rows);
 
     respo
 }
 
 async fn get_posts(State(state): State<Arc<AppState>>) -> String {
     "".to_string()
+}
+
+#[derive(Debug)]
+struct Post {
+    id: i32,
+    title: String,
+    content: String,
+    author: Option<String>,
 }
