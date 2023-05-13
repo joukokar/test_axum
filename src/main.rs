@@ -80,12 +80,16 @@ async fn root_handler(State(state): State<Arc<AppState>>) -> String {
 }
 
 async fn post_json_handler(
-    Path(user_id): Path<String>,
+    Path(post_id): Path<String>,
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Post>, ()> {
     let new_state = state.as_ref();
-    let mut rows = get_posts(&new_state.pool).await;
-    match rows.pop() {
+    let rows = get_posts(&new_state.pool).await;
+    let matched_row = rows
+        .iter()
+        .find(|row| row.id.to_string() == post_id)
+        .cloned();
+    match matched_row {
         Some(row) => Ok(Json(row)),
         None => return Err(()),
     }
@@ -121,7 +125,7 @@ async fn get_posts(pool: &Pool<Postgres>) -> Vec<Post> {
 }
 
 // #[serde(rename_all = "camelCase")]
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 struct Post {
     id: i32,
     title: String,
