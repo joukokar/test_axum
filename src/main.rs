@@ -1,5 +1,6 @@
 use axum::{
     extract::{Path, State},
+    http::StatusCode,
     routing::get,
     Json, Router,
 };
@@ -82,7 +83,7 @@ async fn root_handler(State(state): State<Arc<AppState>>) -> String {
 async fn post_json_handler(
     Path(post_id): Path<String>,
     State(state): State<Arc<AppState>>,
-) -> Result<Json<Post>, ()> {
+) -> Result<Json<Post>, StatusCode> {
     let new_state = state.as_ref();
     let rows = get_posts(&new_state.pool).await;
     let matched_row = rows
@@ -91,7 +92,7 @@ async fn post_json_handler(
         .cloned();
     match matched_row {
         Some(row) => Ok(Json(row)),
-        None => return Err(()),
+        None => Err(StatusCode::NOT_FOUND),
     }
 }
 
